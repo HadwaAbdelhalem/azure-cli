@@ -24,7 +24,7 @@ from azure.cli.command_modules.vm._validators import (
 
 # pylint: disable=too-many-statements, too-many-branches
 def load_arguments(self, _):
-    from azure.mgmt.compute.models import CachingTypes, UpgradeMode
+    StorageAccountTypes, UpgradeMode, CachingTypes = self.get_models('StorageAccountTypes', 'UpgradeMode', 'CachingTypes')
 
     # REUSABLE ARGUMENT DEFINITIONS
     name_arg_type = CLIArgumentType(options_list=['--name', '-n'], metavar='NAME')
@@ -40,11 +40,12 @@ def load_arguments(self, _):
                                      completer=get_resource_name_completion_list('Microsoft.Compute/virtualMachineScaleSets'),
                                      help="Scale set name. You can configure the default using `az configure --defaults vmss=<name>`",
                                      id_part='name')
-    if self.supported_api_version(min_api='2018-06-01', operation_group='disks') or self.supported_api_version(min_api='2018-06-01', operation_group='virtual_machines'):
-        disk_sku = CLIArgumentType(arg_type=get_enum_type(['Premium_LRS', 'Standard_LRS', 'StandardSSD_LRS', 'UltraSSD_LRS']))
-    elif self.supported_api_version(min_api='2018-04-01', operation_group='disks') or self.supported_api_version(min_api='2018-06-01', operation_group='virtual_machines'):
-        disk_sku = CLIArgumentType(arg_type=get_enum_type(['Premium_LRS', 'Standard_LRS', 'StandardSSD_LRS']))
+
+    if StorageAccountTypes:
+        disk_sku = CLIArgumentType(arg_type=get_enum_type(StorageAccountTypes))
     else:
+        # StorageAccountTypes introduced in api version 2016_04_30_preview of Resource.MGMT.Compute package..
+        # However, 2017-03-09-profile targets version 2016-03-30 of compute package.
         disk_sku = CLIArgumentType(arg_type=get_enum_type(['Premium_LRS', 'Standard_LRS']))
 
     # special case for `network nic scale-set list` command alias
@@ -110,6 +111,7 @@ def load_arguments(self, _):
         c.argument('data_disk_sources', nargs='+', help='Space-separated list of data disk sources, including unmanaged blob URI, managed disk ID or name, or snapshot ID or name')
         c.argument('zone_resilient', min_api='2017-12-01', arg_type=get_three_state_flag(), help='Specifies whether an image is zone resilient or not. '
                    'Default is false. Zone resilient images can be created only in regions that provide Zone Redundant Storage')
+        c.argument('storage_sku', arg_type=disk_sku, help='The SKU of the storage account with which to create the VM image. Unused if source VM is specified.')
         c.ignore('source_virtual_machine', 'os_blob_uri', 'os_disk', 'os_snapshot', 'data_blob_uris', 'data_disks', 'data_snapshots')
     # endregion
 
@@ -119,7 +121,7 @@ def load_arguments(self, _):
 
     with self.argument_context('vm availability-set create') as c:
         c.argument('availability_set_name', name_arg_type, validator=get_default_location_from_resource_group, help='Name of the availability set')
-        c.argument('platform_update_domain_count', type=int, help='Update Domain count. If unspecified, server picks the most optimal number like 5. For the latest defaults see https://docs.microsoft.com/en-us/rest/api/compute/availabilitysets/availabilitysets-create')
+        c.argument('platform_update_domain_count', type=int, help='Update Domain count. If unspecified, the server will pick the most optimal number like 5.')
         c.argument('platform_fault_domain_count', type=int, help='Fault Domain count.')
         c.argument('validate', help='Generate and validate the ARM template without creating any resources.', action='store_true')
         c.argument('unmanaged', action='store_true', min_api='2016-04-30-preview', help='contained VMs should use unmanaged disks')
@@ -271,7 +273,7 @@ def load_arguments(self, _):
 
     with self.argument_context('vm list-skus') as c:
         c.argument('size', options_list=['--size', '-s'], help="size name, partial name is accepted")
-        c.argument('zone', options_list=['--zone', '-z'], arg_type=get_three_state_flag(), help="show all vm size supporting availabilityt zones")
+        c.argument('zone', options_list=['--zone', '-z'], arg_type=get_three_state_flag(), help="show all vm size supporting availability zones")
         c.argument('show_all', options_list=['--all'], help="show all information including vm sizes not available under the current subscription")
         c.argument('resource_type', options_list=['--resource-type', '-r'], help='resource types e.g. "availabilitySets", "snapshots", "disk", etc')
     # endregion
@@ -409,10 +411,20 @@ def load_arguments(self, _):
             c.argument('authentication_type', help='Type of authentication to use with the VM. Defaults to password for Windows and SSH public key for Linux.', arg_type=get_enum_type(['ssh', 'password']))
 
         with self.argument_context(scope, arg_group='Storage') as c:
+            if StorageAccountTypes:
+                allowed_values = ", ".join([sku.value for sku in StorageAccountTypes])
+            else:
+                allowed_values = ", ".join(['Premium_LRS', 'Standard_LRS'])
+
+            usage = 'Usage: [--storage-sku SKU | --storage-sku ID=SKU ID=SKU ID=SKU...], where each ID is "os" or a 0-indexed lun.'
+            allowed_values = 'Allowed values: {}.'.format(allowed_values)
+            storage_sku_help = 'The SKU of the storage account with which to persist VM. Use a singular sku that would be applied across all disks, ' \
+                               'or specify individual disks. {} {}'.format(usage, allowed_values)
+
             c.argument('os_disk_name', help='The name of the new VM OS disk.')
             c.argument('os_type', help='Type of OS installed on a custom VHD. Do not use when specifying an URN or URN alias.', arg_type=get_enum_type(['windows', 'linux']))
             c.argument('storage_account', help="Only applicable when used with `--use-unmanaged-disk`. The name to use when creating a new storage account or referencing an existing one. If omitted, an appropriate storage account in the same resource group and location will be used, or a new one will be created.")
-            c.argument('storage_sku', arg_type=disk_sku, help='The SKU of the storage account with which to persist VM')
+            c.argument('storage_sku', nargs='+', help=storage_sku_help)
             c.argument('storage_container_name', help="Only applicable when used with `--use-unmanaged-disk`. Name of the storage container for the VM OS disk. Default: vhds")
             c.ignore('os_publisher', 'os_offer', 'os_sku', 'os_version', 'storage_profile')
             c.argument('use_unmanaged_disk', action='store_true', help='Do not use managed disk to persist VM')
@@ -499,7 +511,7 @@ def load_arguments(self, _):
         c.argument('gallery_image_name', options_list=['--gallery-image-definition', '-i'], help='gallery image definition')
         c.argument('gallery_image_version', options_list=['--gallery-image-version', '-e'], help='gallery image version')
 
-    for scope in ['sig show', 'image gallery delete', 'sig image-definition show', 'sig image-definition delete', 'sig image-definition show', 'sig image-version delete']:
+    for scope in ['sig show', 'image gallery delete', 'sig image-definition show', 'sig image-definition delete', 'sig image-definition show']:
         with self.argument_context(scope) as c:
             c.argument('gallery_name', options_list=['--gallery-name', '-r'], id_part='name', help='gallery name')
             c.argument('gallery_image_name', options_list=['--gallery-image-definition', '-i'], id_part='child_name_1', help='gallery image definition')

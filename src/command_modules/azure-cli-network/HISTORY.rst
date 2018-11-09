@@ -3,12 +3,28 @@
 Release History
 ===============
 
+2.2.8
++++++
+* Deprecated `network interface-endpoint` command names in favor of `network private-endpoint`.
+* `express-route peering connection create`: Fix issue where `--peer-circuit` would not accept an ID.
+* `public-ip create`: Fix issue where `--ip-tags` did not work correctly.
+
+2.2.7
++++++
+* `nic create` - Add `--app-gateway-address-pools` and `--gateway-name` arguments to support adding application
+  gateway backend address pools to a NIC.
+* `nic ip-config create/update` - Add `--app-gateway-address-pools` and `--gateway-name` arguments to support adding application
+  gateway backend address pools to a NIC.
+
+
 2.2.6
 +++++
 * Fix `network dns zone create`. Command succeeds even if the user has configured a default location. See #6052.
 * `network vnet peering create`: Deprecated `--remote-vnet-id`. Added --remote-vnet which accepts a name or ID.
 * `network vnet create`: Added support for multiple subnet prefixes with `--subnet-prefixes`.
 * `network vnet subnet create/update`: Added support for multiple subnet prefixes with `--address-prefixes`.
+* `network application-gateway create`: Fixed logic that prevented creating gateways with WAF_v2 or Standard_v2 SKU.
+* `network vnet subnet update`: Added `--service-endpoint-policy` convenience argument.
 
 2.2.5
 +++++

@@ -2,6 +2,17 @@
 
 Release History
 ===============
+
+2.2.4
++++++
+* Allow connection to storage services only with SAS and endpoints (without an account name or a key) as described in
+  `Configure Azure Storage connection strings <https://docs.microsoft.com/azure/storage/common/storage-configure-connection-string>`_.
+
+2.2.3
++++++
+* Fix `az storage cors list` output formatting, all items show correct "Service" key
+* `--bypass-immutability-policy` parameter for immutability-policy blocked container deletion
+
 2.2.2
 +++++
 * `--auth-mode login` parameter allows use of user's login credentials for blob and queue authorization.

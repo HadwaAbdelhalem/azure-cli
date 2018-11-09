@@ -100,6 +100,13 @@ helps['storage container create'] = """
           text: az storage container create -n MyStorageContainer --fail-on-exist
 """
 
+helps['storage container delete'] = """
+    type: command
+    short-summary: Marks the specified container for deletion.
+    long-summary: >
+        The container and any blobs contained within it are later deleted during garbage collection.
+"""
+
 helps['storage account list'] = """
     type: command
     short-summary: List storage accounts.
@@ -208,6 +215,22 @@ helps['storage blob copy'] = """
 helps['storage blob incremental-copy'] = """
     type: group
     short-summary: Manage blob incremental copy operations.
+"""
+
+helps['storage blob incremental-copy start'] = """
+    type: command
+    short-summary: Copies an incremental copy of a blob asynchronously.
+    long-summary: This operation returns a copy operation
+        properties object, including a copy ID you can use to check or abort the
+        copy operation. The Blob service copies blobs on a best-effort basis.
+        The source blob for an incremental copy operation must be a page blob.
+        Call get_blob_properties on the destination blob to check the status of the copy operation.
+        The final blob will be committed when the copy completes.
+    examples:
+        - name: Upload all files that end with .py unless blob exists and has been modified since given date.
+          text: az storage blob incremental-copy start --source-container MySourceContainer --source-blob MyBlob
+                --source-account-name MySourceAccount --source-account-key MySourceKey --source-snapshot MySnapshot
+                --destination-container MyDestinationContainer --destination-blob MyDestinationBlob
 """
 
 helps['storage blob lease'] = """
@@ -743,6 +766,11 @@ helps['storage queue policy'] = """
 helps['storage share'] = """
     type: group
     short-summary: Manage file shares.
+"""
+
+helps['storage share url'] = """
+    type: command
+    short-summary: Create a URI to access a file share.
 """
 
 helps['storage share exists'] = """

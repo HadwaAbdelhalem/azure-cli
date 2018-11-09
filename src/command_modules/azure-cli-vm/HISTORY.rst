@@ -2,6 +2,29 @@
 
 Release History
 ===============
+
+2.2.8
+++++++
+* `vm create --storage-sku`: can now specify the storage account sku for managed os and data disks separately.
+
+2.2.7
+++++++
+* `image create`: expose storage-sku argument for setting the image's default storage account type
+* `vm resize`: fix bug where `--no-wait` option causes command to crash
+* `vm encryption show`: table output format shows status
+* `vm secret format`: requires json/jsonc output. Warns user and defaults to json output if an undesired output format is selected.
+* `vm create --image`: improved validation of image argument
+
+2.2.6
+++++++
+* `vm/vmss create`: enforce disk caching mode be `None` for Lv/Lv2 series of machines
+* `vm create`: update supported size list supporting networking accelerator
+* `disk update`: expose strong typed arguments for ultrassd iops and mbps configs
+
+2.2.5
+++++++
+* Fix SDK issue that caused Homebrew installation to fail.
+
 2.2.4
 ++++++
 * `az disk grant-access`: fix the empty "accessSas" field

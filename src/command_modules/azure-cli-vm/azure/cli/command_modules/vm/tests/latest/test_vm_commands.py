@@ -306,7 +306,7 @@ class VMCustomImageTest(ScenarioTest):
         self.cmd('vm generalize -g {rg} -n {vm1}')
         self.cmd('image create -g {rg} -n {image1} --source {vm1}')
 
-        self.cmd('vm create -g {rg} -n {vm2} --image ubuntults --storage-sku standard_lrs --data-disk-sizes-gb 1 --admin-username sdk-test-admin --admin-password testPassword0')
+        self.cmd('vm create -g {rg} -n {vm2} --image ubuntults --storage-sku standard_lrs --data-disk-sizes-gb 1 1 --admin-username sdk-test-admin --admin-password testPassword0')
         self.cmd('vm run-command invoke -g {rg} -n {vm2} --command-id RunShellScript --scripts "echo \'sudo waagent -deprovision+user --force\' | at -M now + 1 minutes"')
         time.sleep(70)
         self.cmd('vm deallocate -g {rg} -n {vm2}')
@@ -327,26 +327,35 @@ class VMCustomImageTest(ScenarioTest):
         self.cmd('vm show -g {rg} -n {newvm2}', checks=[
             self.check('storageProfile.imageReference.resourceGroup', '{rg}'),
             self.check('storageProfile.osDisk.createOption', 'FromImage'),
-            self.check("length(storageProfile.dataDisks)", 1),
+            self.check("length(storageProfile.dataDisks)", 2),
             self.check("storageProfile.dataDisks[0].createOption", 'FromImage'),
             self.check('storageProfile.dataDisks[0].managedDisk.storageAccountType', 'Standard_LRS')
         ])
 
-        self.cmd('vm create -g {rg} -n vm3 --image {image2} --admin-username sdk-test-admin --admin-password testPassword0 --authentication-type password --storage-sku Premium_LRS')
+        self.cmd('vm create -g {rg} -n vm3 --image {image2} --admin-username sdk-test-admin --admin-password testPassword0 --authentication-type password --storage-sku os=Premium_LRS 2=StandardSSD_LRS --data-disk-sizes-gb 1')
         self.cmd('vm show -g {rg} -n vm3', checks=[
             self.check('storageProfile.imageReference.resourceGroup', '{rg}'),
             self.check('storageProfile.osDisk.createOption', 'FromImage'),
-            self.check("length(storageProfile.dataDisks)", 1),
+            self.check('storageProfile.osDisk.managedDisk.storageAccountType', 'Premium_LRS'),
+
+            self.check("length(storageProfile.dataDisks)", 3),
             self.check("storageProfile.dataDisks[0].createOption", 'FromImage'),
-            self.check('storageProfile.dataDisks[0].managedDisk.storageAccountType', 'Premium_LRS')
+            self.check("storageProfile.dataDisks[1].createOption", 'FromImage'),
+            self.check("storageProfile.dataDisks[2].createOption", 'Empty'),
+
+            self.check('storageProfile.dataDisks[0].managedDisk.storageAccountType', 'Standard_LRS'),
+            self.check('storageProfile.dataDisks[1].managedDisk.storageAccountType', 'Standard_LRS'),
+            self.check('storageProfile.dataDisks[2].managedDisk.storageAccountType', 'StandardSSD_LRS')
         ])
 
         self.cmd('vmss create -g {rg} -n vmss2 --image {image2} --admin-username sdk-test-admin --admin-password testPassword0 --authentication-type password', checks=[
             self.check('vmss.virtualMachineProfile.storageProfile.imageReference.resourceGroup', '{rg}'),
             self.check('vmss.virtualMachineProfile.storageProfile.osDisk.createOption', 'FromImage'),
-            self.check("length(vmss.virtualMachineProfile.storageProfile.dataDisks)", 1),
+            self.check("length(vmss.virtualMachineProfile.storageProfile.dataDisks)", 2),
             self.check("vmss.virtualMachineProfile.storageProfile.dataDisks[0].createOption", 'FromImage'),
-            self.check("vmss.virtualMachineProfile.storageProfile.dataDisks[0].managedDisk.storageAccountType", 'Standard_LRS')
+            self.check("vmss.virtualMachineProfile.storageProfile.dataDisks[0].managedDisk.storageAccountType", 'Standard_LRS'),
+            self.check("vmss.virtualMachineProfile.storageProfile.dataDisks[1].createOption", 'FromImage'),
+            self.check("vmss.virtualMachineProfile.storageProfile.dataDisks[1].managedDisk.storageAccountType", 'Standard_LRS')
         ])
 
 
@@ -549,7 +558,9 @@ class VMManagedDiskScenarioTest(ScenarioTest):
             'disk2': 'd2',
             'snapshot1': 's1',
             'snapshot2': 's2',
-            'image': 'i1'
+            'image': 'i1',
+            'image_2': 'i2',
+            'image_3': 'i3'
         })
 
         # create a disk and update
@@ -600,6 +611,23 @@ class VMManagedDiskScenarioTest(ScenarioTest):
             self.check('storageProfile.dataDisks[1].lun', 1),
             self.check('tags.tag1', 'i1')
         ])
+
+        # test that images can be created with different storage skus
+        self.cmd('image create -g {rg} -n {image_2} --source {snapshot1} --data-disk-sources {disk1} {snapshot2_id} {disk2_id}'
+                 ' --os-type Linux --tags tag1=i1 --storage-sku Premium_LRS',
+                 checks=[
+                     self.check('storageProfile.osDisk.storageAccountType', 'Premium_LRS'),
+                     self.check('storageProfile.osDisk.osType', 'Linux'),
+                     self.check('storageProfile.osDisk.snapshot.id', '{snapshot1_id}'),
+                     self.check('length(storageProfile.dataDisks)', 3),
+                     self.check('storageProfile.dataDisks[0].lun', 0),
+                     self.check('storageProfile.dataDisks[1].lun', 1),
+                     self.check('tags.tag1', 'i1')
+                 ])
+
+        self.cmd('image create -g {rg} -n {image_3} --source {snapshot1} --data-disk-sources {disk1} {snapshot2_id} {disk2_id}'
+                 ' --os-type Linux --tags tag1=i1 --storage-sku Standard_LRS',
+                 checks=self.check('storageProfile.osDisk.storageAccountType', 'Standard_LRS'))
 
 
 class VMWriteAcceleratorScenarioTest(ScenarioTest):
@@ -1360,6 +1388,17 @@ class VMDiskAttachDetachTest(ScenarioTest):
         self.cmd('vm show -g {rg} -n {vm2}', checks=[
             self.check('storageProfile.osDisk.managedDisk.storageAccountType', 'Premium_LRS'),
             self.check('storageProfile.dataDisks[0].managedDisk.storageAccountType', 'UltraSSD_LRS'),
+        ])
+
+    @ResourceGroupPreparer(name_prefix='cli-test-ultrassd', location='eastus2')
+    def test_vm_ultra_ssd_disk_update(self, resource_group):
+        self.kwargs.update({
+            'disk1': 'd1'
+        })
+        self.cmd('disk create -g {rg} -n {disk1} --size-gb 4 --sku UltraSSD_LRS --disk-iops-read-write 500 --disk-mbps-read-write 8 --zone 3')
+        self.cmd('disk update -g {rg} -n {disk1} --disk-iops-read-write 510 --disk-mbps-read-write 10', checks=[
+            self.check('diskIopsReadWrite', 510),
+            self.check('diskMbpsReadWrite', 10)
         ])
 
     @ResourceGroupPreparer(name_prefix='cli-test-ultrassd', location='eastus2')
@@ -2774,7 +2813,7 @@ class VMGalleryImage(ScenarioTest):
 
         self.cmd('vm create -g {rg} -n {vm2} --image {image_id} --admin-username clitest1 --generate-ssh-keys', checks=self.check('powerState', 'VM running'))
 
-        self.cmd('sig image-version delete -g {rg} --gallery-name {gallery} --gallery-image-definition {image} --gallery-image-version {version}')
+        self.cmd('sig image-version delete -g {rg} --gallery-name {gallery} --gallery-image-definition {image} --gallery-image-version-name {version}')
         time.sleep(60)  # service end latency
         self.cmd('sig image-definition delete -g {rg} --gallery-name {gallery} --gallery-image-definition {image}')
         self.cmd('sig delete -g {rg} --gallery-name {gallery}')
